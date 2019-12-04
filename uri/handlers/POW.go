@@ -77,6 +77,7 @@ func TryNoncesTillFound(){
 				return
 			}
 			fmt.Println("Incorrect insertion")
+			return
 		}
 
 		//fmt.Println("Tried NONCE: " + x + "\n" )

@@ -27,11 +27,24 @@ var(
 	Started = false
 )
 
+func downloadChain(){
 
+	for _, peer := range PeerList.PeerIds {
+		resp, _ := http.Get("http://localhost:"+ peer + "/show")
+
+		if resp != nil{
+
+			chain, _ := readResponseBody(resp)
+
+			PersonalBC.BC = data.DecodeFromJson(chain)
+			return
+		}
+	}
+}
 //Initializes peer
 func InitSelfAddress(port string) {
-	SelfAddress = "http://localhost:" + port
 	PersonalBC.BC.InitialChain()//Initializer
+	SelfAddress = "http://localhost:" + port
 	//Sets
 	PeerList.SelfId = port
 	x := make([]string, 0)
@@ -47,21 +60,24 @@ func InitSelfAddress(port string) {
 }
 
 func generateBlock(){
+	fmt.Println("block-chain length : ",PersonalBC.BC.Length)
 	fmt.Println("\nGenerating new block \n\n")
 	rand.Seed(time.Now().UnixNano())
 	var block data.Block
 	latestBlocks := PersonalBC.SyncGetLatestBlock()
+	fmt.Println("Got blocks from sync function \n")
 	block.Initial(PersonalBC.BC.Length+1, latestBlocks[0].BlockHeader.Hash,  string(rand.Intn(10)))
 	fmt.Println("\nNew block : " + block.EncodeBlockToJson())
 	BlockToBeMined = block
 
-	fmt.Println("\nNew heartbeat : ",HeartBeat)
+	//fmt.Println("\nNew heartbeat : ",HeartBeat)
 }
 
 
 func Start(w http.ResponseWriter, r *http.Request){
 	fmt.Println("\n length : ", PersonalBC.BC.Length)
 	updatePeers()
+	downloadChain()
 	x := int(PersonalBC.BC.Length)
 	Started = true
 	if x == -1 {//Genesis case ::: blockchain empty
@@ -145,7 +161,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 func ReceiveBlock(w http.ResponseWriter, r *http.Request){
 
 	if Started == false{
-		return 
+		return
 	}
 
 		//w.WriteHeader(http.StatusOK)
@@ -191,7 +207,12 @@ func ReceiveBlock(w http.ResponseWriter, r *http.Request){
 						}
 
 						if parent != nil {
-							_ = PersonalBC.BC.Insert(block)
+							//fmt.Println("ERROR HERE")
+							err = PersonalBC.BC.Insert(block)
+
+							if err == nil{
+								fmt.Println("\nBlock inserted properly")
+							}
 						}
 
 					}
