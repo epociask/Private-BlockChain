@@ -28,15 +28,15 @@ var(
 )
 
 func downloadChain(){
-
 	for _, peer := range PeerList.PeerIds {
-		resp, _ := http.Get("http://localhost:"+ peer + "/show")
+		resp, _ := http.Get("http://localhost:"+ peer + "/download")
 
 		if resp != nil{
 
 			chain, _ := readResponseBody(resp)
 
 			PersonalBC.BC = data.DecodeFromJson(chain)
+			PersonalBC.BC.Length = int32(len(PersonalBC.BC.Chain)-1)
 			return
 		}
 	}
@@ -55,7 +55,7 @@ func InitSelfAddress(port string) {
 	PeerList.InsertToList(x)
 	fmt.Println(PeerList.PeerIds)
 	HeartBeat.SendersId = PeerList.SelfId
-	Difficulty = 4
+	Difficulty = 5
 	PersonalBC.BC.SetDifficuty(Difficulty)
 }
 
@@ -66,21 +66,37 @@ func generateBlock(){
 	var block data.Block
 	latestBlocks := PersonalBC.SyncGetLatestBlock()
 	fmt.Println("Got blocks from sync function \n")
+	if len(latestBlocks) == 0{
+		return
+	}
 	block.Initial(PersonalBC.BC.Length+1, latestBlocks[0].BlockHeader.Hash,  string(rand.Intn(10)))
 	fmt.Println("\nNew block : " + block.EncodeBlockToJson())
 	BlockToBeMined = block
 
 	//fmt.Println("\nNew heartbeat : ",HeartBeat)
 }
+func Download(w http.ResponseWriter, r *http.Request){
 
+	if Started == false{
+
+		w.WriteHeader(401)
+		return
+	}
+	w.WriteHeader(404)
+	_, _ = w.Write([]byte(PersonalBC.BC.EncodeToJson()))
+}
 
 func Start(w http.ResponseWriter, r *http.Request){
 	fmt.Println("\n length : ", PersonalBC.BC.Length)
 	updatePeers()
 	downloadChain()
-	x := int(PersonalBC.BC.Length)
+
+	//x := int(PersonalBC.BC.Length)
+	fmt.Println(PersonalBC.BC.Length)
+	fmt.Println("=======================")
+
 	Started = true
-	if x == -1 {//Genesis case ::: blockchain empty
+	if PersonalBC.BC.Length == -1 {//Genesis case ::: blockchain empty
 		fmt.Println("GENESIS CASE \n")
 		var genesisBlock data.Block
 
@@ -89,7 +105,7 @@ func Start(w http.ResponseWriter, r *http.Request){
 	}
 
 	for {
-		TryNoncesTillFound()
+		go TryNoncesTillFound()
 		generateBlock()
 	}
 
@@ -208,7 +224,7 @@ func ReceiveBlock(w http.ResponseWriter, r *http.Request){
 
 						if parent != nil {
 							//fmt.Println("ERROR HERE")
-							err = PersonalBC.BC.Insert(block)
+							err = PersonalBC.Insert(block)
 
 							if err == nil{
 								fmt.Println("\nBlock inserted properly")
@@ -336,7 +352,10 @@ func SendBlock() {
 }
 
 func Show(w http.ResponseWriter, r *http.Request){
-	_, _ = fmt.Fprint(w, PersonalBC.BC.EncodeToJson())
+	fmt.Println(PersonalBC.BC)
+	fmt.Println("-------")
+	fmt.Println(PersonalBC.BC.Length)
+	fmt.Fprint(w, 	PersonalBC.BC.Show())
 
 }
 

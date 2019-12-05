@@ -2,10 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="afa0cc62-2261-44f6-b546-8eb5ed0f5e88" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uri/handlers/POW.go" beforeDir="false" afterPath="$PROJECT_DIR$/uri/handlers/POW.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/BlockChain.go" beforeDir="false" afterPath="$PROJECT_DIR$/data/BlockChain.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/SyncBlockChain.go" beforeDir="false" afterPath="$PROJECT_DIR$/data/SyncBlockChain.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/uri/handlers/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/uri/handlers/handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uri/routes.go" beforeDir="false" afterPath="$PROJECT_DIR$/uri/routes.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -72,7 +73,16 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Go Build.go build main.go">
+  <component name="RunManager" selected="Go Build.Node1">
+    <configuration name="Node1" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true">
+      <module name="Project3" />
+      <working_directory value="$PROJECT_DIR$/" />
+      <parameters value="8000" />
+      <kind value="FILE" />
+      <filePath value="$PROJECT_DIR$/main.go" />
+      <directory value="$PROJECT_DIR$/" />
+      <method v="2" />
+    </configuration>
     <configuration name="go build POW.go" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
       <module name="Project3" />
       <working_directory value="$PROJECT_DIR$/" />
@@ -81,17 +91,13 @@
       <directory value="$PROJECT_DIR$/" />
       <method v="2" />
     </configuration>
-    <configuration name="go build main.go" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
-      <module name="Project3" />
-      <working_directory value="$PROJECT_DIR$/" />
-      <kind value="FILE" />
-      <filePath value="$PROJECT_DIR$/main.go" />
-      <directory value="$PROJECT_DIR$/" />
-      <method v="2" />
-    </configuration>
+    <list>
+      <item itemvalue="Go Build.Node1" />
+      <item itemvalue="Go Build.go build POW.go" />
+    </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Go Build.go build main.go" />
+        <item itemvalue="Go Build.Node1" />
         <item itemvalue="Go Build.go build POW.go" />
       </list>
     </recent_temporary>

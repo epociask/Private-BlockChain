@@ -10,6 +10,14 @@ type SyncBlockChain struct{
 
 }
 
+	func (chain *SyncBlockChain) Insert(block Block) error {
+		chain.Lock.Lock()
+		defer chain.Lock.Unlock()
+		return chain.BC.Insert(block)
+
+	}
+
+
 	func  (chain *SyncBlockChain) SyncGetLatestBlock() []Block{
 
 		chain.Lock.Lock()

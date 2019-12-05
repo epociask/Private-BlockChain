@@ -68,5 +68,10 @@ var routes = Routes{
 		handlers.ShowPeers,
 	},
 
-
+	Route{
+		"Download",
+		"GET",
+		"/download",
+		handlers.Download,
+	},
 }

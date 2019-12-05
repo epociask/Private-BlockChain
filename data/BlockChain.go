@@ -77,6 +77,62 @@ func (blockchain *BlockChain) GetLatestBlocks() []Block{
 
 }
 
+	func countZeros(hash string) int{
+
+		count := 0
+		for{
+
+			if strings.HasPrefix("0", hash) == false{
+				break
+
+			}
+
+			count++
+			hash = strings.TrimPrefix(hash, "0")
+		}
+
+		return count
+	}
+//data.HashFunction(BlockToBeMined.BlockHeader.ParentHash + x + BlockToBeMined.Value)
+func allSameStrings(a []int) bool {
+	for i := 1; i < len(a); i++ {
+		if a[i] != a[0] {
+			return false
+		}
+	}
+	return true
+}
+	func getCanonical(blocks []Block)  (Block, error){
+		 n := 0
+		zeroArray := make([]int, len(blocks))
+
+		for i := 0; i < len(blocks); i++{
+
+			zeroArray[i] = countZeros(HashFunction(blocks[i].BlockHeader.ParentHash + blocks[i].BlockHeader.Nonce + blocks[i].Value))
+		}
+
+		if allSameStrings(zeroArray){
+
+			return blocks[0], errors.New("Fork not resolved")
+		}
+		for i := 0; i < len(zeroArray); i++{
+			if zeroArray[i]>n {
+				n = i
+			}
+		}
+
+
+		for i := 0; i < len(zeroArray); i++{
+			if zeroArray[i]>n {
+				n = i
+			}
+		}
+
+		return blocks[n], nil
+
+	}
+
+
 func (blockchain *BlockChain) Show() string {
 
   rs := ""
@@ -95,11 +151,30 @@ func (blockchain *BlockChain) Show() string {
 
      var hashs []string
 
-     for _, block := range blockchain.Chain[int32(id)] {
+      blocks := blockchain.Chain[int32(id)]
+      tempBlock := Block{}
+      err := errors.New("")
+      if (len(blocks)>1){
+		  tempBlock, err = getCanonical(blocks)
+	  } else {
+	  	tempBlock = blocks[0]
+	  	err = nil
+	  }
 
-        hashs = append(hashs, block.BlockHeader.Hash+"<="+block.BlockHeader.ParentHash)
 
-     }
+      if err != nil{
+
+      	hashs = append(hashs, "Fork not yet resolved ")
+		  for _, block := range blockchain.Chain[int32(id)] {
+
+			  hashs = append(hashs, block.BlockHeader.Hash+"<="+block.BlockHeader.ParentHash)
+
+		  }
+	  }else{
+
+		  hashs = append(hashs, tempBlock.BlockHeader.Hash+"<="+tempBlock.BlockHeader.ParentHash)
+
+	  }
 
      sort.Strings(hashs)
 
@@ -141,6 +216,24 @@ func (blockchain *BlockChain) GetParentBlock(block Block) *Block{
 
 }
 
+	//func countZeros(string hash){
+	//
+	//	for
+	//}
+	//func isCannonical(blocks []Block) Block{
+	//
+	//	if len(blocks) == 1{
+	//		return blocks[0]
+	//	}
+	//
+	//	for _, block := range blocks{
+	//
+	//
+	//	}
+	//
+	//}
+
+
 func (blockchain *BlockChain) EncodeToJson() string{
 
 	var final string
@@ -152,8 +245,8 @@ func (blockchain *BlockChain) EncodeToJson() string{
 		for x := 0; x < len(temp); x++{
 
 
-		final += temp[x].EncodeBlockToJson()
-		final += "\n"
+			final += temp[x].EncodeBlockToJson()
+			final += "\n"
 		}
 	}
 	final += "]"
@@ -162,6 +255,10 @@ func (blockchain *BlockChain) EncodeToJson() string{
 
 
 }
+//Nakamoto Consensus
+	func (bc *BlockChain) isCannoncial(){
+
+	}
 func DecodeFromJson(jsonString string) BlockChain{
 
 		var tempChain BlockChain
