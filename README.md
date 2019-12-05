@@ -1,2 +1,4 @@
-# cs486
-starter code to impliment your apis
+TO RUN 
+
+#go run main.go 8000
+#go run main.go 8001
