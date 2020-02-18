@@ -1,4 +1,4 @@
-TO RUN 
-
-#go run main.go 8000
-#go run main.go 8001
+## Private BlockChain CS486 written in Golang
+# Deployed as a broadcast network using a restful API 
+# Protocol mines and communicates concurrently 
+# Fork safe and thread safe 
