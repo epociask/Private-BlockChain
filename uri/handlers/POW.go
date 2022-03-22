@@ -1,15 +1,14 @@
 package handlers
 
 import (
-	"../../data"
+	"chain/data"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
 )
-
-
 
 func RandomHex(n int) (string, error) {
 	bytes := make([]byte, n)
@@ -19,14 +18,13 @@ func RandomHex(n int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func GenerateNonce() (string, error){
+func GenerateNonce() (string, error) {
 
 	x, err := RandomHex(10)
 
+	if err == nil {
 
-	if err == nil{
-
-		x = x[0: 16	]
+		x = x[0:16]
 		return x, err
 
 	}
@@ -35,68 +33,59 @@ func GenerateNonce() (string, error){
 	return "", nil
 }
 
-
-//Heart of script //@params: diffuclty and block
-//@returns string of successfully found nonce
-func TryNoncesTillFound(){
+func TryNoncesTillFound() {
 
 	x, err := GenerateNonce()
 	fmt.Println("Trying Nonces ")
-	//fmt.Println("BLOCK ABOUT TO MINED : ", HeartBeat.BlockJson)
-	if err != nil{
+	if err != nil {
 
 		fmt.Println("error")
 
 	}
 
-	//fmt.Println(HeartBeat.BlockJson)
+	for {
 
+		if BlockToBeMined.BlockHeader.Height == PersonalBC.BC.Length {
 
-	for{
-
-		if BlockToBeMined.BlockHeader.Height == PersonalBC.BC.Length{
-
-			if HeartBeat.SendersId != PeerList.SelfId{
-			return
+			if HeartBeat.SendersId != PeerList.SelfId {
+				return
 			}
 		}
 
-			y := data.HashFunction(BlockToBeMined.BlockHeader.ParentHash + x + BlockToBeMined.Value)
+		y := data.SHA256(BlockToBeMined.BlockHeader.ParentHash + x + BlockToBeMined.Value)
 
-
-		if strings.Count(y[0 : Difficulty], "0") >= Difficulty{
+		if strings.Count(y[0:Difficulty], "0") >= int(Difficulty) {
 			BlockToBeMined.BlockHeader.Nonce = x
 
 			err := PersonalBC.BC.Insert(BlockToBeMined)
-			fmt.Println(PersonalBC.BC.EncodeToJson())
-			HeartBeat.BlockJson = BlockToBeMined.EncodeBlockToJson()
+			if err != nil {
+				log.Printf("Incorrect insertion : %s", err.Error())
+				return
+			}
+
+			jsonBlock, err := BlockToBeMined.EncodeBlockToJson()
+			if err != nil {
+				log.Printf("Could not unmarshal json : %s", err.Error())
+				return
+			}
+
+			HeartBeat.BlockJson = jsonBlock
 			HeartBeat.SendersId = PeerList.SelfId
-			if err == nil{
+			if err == nil {
 				fmt.Println("Sending block to peers")
 				SendBlock()
 				return
 			}
-			fmt.Println("Incorrect insertion")
-			return
-		}
 
-		//fmt.Println("Tried NONCE: " + x + "\n" )
+		}
 
 		//Converts hexidemal string to integer
-		f, err := strconv.ParseInt(x, 16, 0)
+		intRep, _ := strconv.ParseInt(x, 16, 0)
 
-		if err != nil{
-			x,_ = GenerateNonce()
-		}
 		//Increment numeric representation
-		f++
-
+		intRep++
 		//reassigning x by casting as a hexidecimal with the fmt.Sprintf()
-		x = fmt.Sprintf("%x", f)
-
-
+		x = fmt.Sprintf("%x", intRep)
 	}
 
 }
-
-

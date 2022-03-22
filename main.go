@@ -1,26 +1,20 @@
 package main
 
 import (
-	"./uri"
+	"chain/uri/handlers"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"./uri/handlers"
+
+	"chain/uri"
 )
 
 var (
 	Router = uri.NewRouter()
 )
 
-
-
-
 func main() {
-
-
-
-
 
 	var port string
 	if len(os.Args) > 1 {
@@ -29,9 +23,8 @@ func main() {
 		port = "6689"
 	}
 
-
 	handlers.InitSelfAddress(port)
 
-	fmt.Println("running: "+ "localhost:"+port)
+	fmt.Println("running: " + "localhost:" + port)
 	log.Fatal(http.ListenAndServe(":"+port, Router))
 }
