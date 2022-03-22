@@ -1,49 +1,58 @@
 package handlers
 
 import (
-	"../../data"
 	"bytes"
+	"chain/data"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 	"time"
-)
-//Multithreading
 
-var(
-	PersonalBC     data.SyncBlockChain
+	"github.com/gorilla/mux"
+)
+
+var (
+	PersonalBC     *data.SyncBlockChain
 	PeerList       data.PeerList
 	SelfAddress    string
 	HeartBeat      data.HeartBeatData
-	Difficulty     int
-	BlockToBeMined data.Block
-	Started = false
+	Difficulty     uint
+	BlockToBeMined *data.Block
+	Started        = false
 )
 
-func downloadChain(){
+func downloadChain() error {
+	var err error
+
 	for _, peer := range PeerList.PeerIds {
-		resp, _ := http.Get("http://localhost:"+ peer + "/download")
+		resp, _ := http.Get("http://localhost:" + peer + "/download")
 
-		if resp != nil{
-
+		if resp != nil {
 			chain, _ := readResponseBody(resp)
 
-			PersonalBC.BC = data.DecodeFromJson(chain)
-			PersonalBC.BC.Length = int32(len(PersonalBC.BC.Chain)-1)
-			return
+			PersonalBC.BC, err = data.DecodeFromJson(chain)
+			if err != nil {
+				return err
+			}
+
+			PersonalBC.BC.Length = int32(len(PersonalBC.BC.Chain) - 1)
+			return nil
 		}
 	}
+
+	return errors.New("could not fetch chain state from peers")
 }
+
 //Initializes peer
 func InitSelfAddress(port string) {
-	PersonalBC.BC.InitialChain()//Initializer
+	PersonalBC = data.NewSyncChain()
+
 	SelfAddress = "http://localhost:" + port
 	//Sets
 	PeerList.SelfId = port
@@ -59,48 +68,59 @@ func InitSelfAddress(port string) {
 	PersonalBC.BC.SetDifficuty(Difficulty)
 }
 
-func generateBlock(){
-	fmt.Println("block-chain length : ",PersonalBC.BC.Length)
-	fmt.Println("\nGenerating new block \n\n")
+func generateBlock() error {
+	fmt.Println("block-chain length : ", PersonalBC.BC.Length)
 	rand.Seed(time.Now().UnixNano())
-	var block data.Block
+
+	block := &data.Block{}
 	latestBlocks := PersonalBC.SyncGetLatestBlock()
-	fmt.Println("Got blocks from sync function \n")
-	if len(latestBlocks) == 0{
-		return
+
+	if len(latestBlocks) == 0 {
+		return nil
 	}
-	block.Initial(PersonalBC.BC.Length+1, latestBlocks[0].BlockHeader.Hash,  string(rand.Intn(10)))
-	fmt.Println("\nNew block : " + block.EncodeBlockToJson())
+	block.Init(PersonalBC.BC.Length+1, latestBlocks[0].BlockHeader.Hash, string(rand.Intn(10)))
+
+	jsonB, err := block.EncodeBlockToJson()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("\nNew block : " + jsonB)
 	BlockToBeMined = block
 
-	//fmt.Println("\nNew heartbeat : ",HeartBeat)
+	return nil
 }
-func Download(w http.ResponseWriter, r *http.Request){
 
-	if Started == false{
+func Download(w http.ResponseWriter, r *http.Request) {
 
+	if !Started {
 		w.WriteHeader(401)
 		return
 	}
+
 	w.WriteHeader(404)
-	_, _ = w.Write([]byte(PersonalBC.BC.EncodeToJson()))
+	chain, err := PersonalBC.BC.EncodeToJson()
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(err.Error()))
+	}
+
+	_, _ = w.Write([]byte(chain))
 }
 
-func Start(w http.ResponseWriter, r *http.Request){
+func Start(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("\n length : ", PersonalBC.BC.Length)
 	updatePeers()
 	downloadChain()
 
-	//x := int(PersonalBC.BC.Length)
 	fmt.Println(PersonalBC.BC.Length)
 	fmt.Println("=======================")
 
 	Started = true
-	if PersonalBC.BC.Length == -1 {//Genesis case ::: blockchain empty
-		fmt.Println("GENESIS CASE \n")
-		var genesisBlock data.Block
+	if PersonalBC.BC.Length == -1 { //Genesis case ::: blockchain empty
+		genesisBlock := &data.Block{}
 
-		genesisBlock.Initial(0, "000000000", "1")
+		genesisBlock.Init(0, "0x0000000000000", "1")
 		BlockToBeMined = genesisBlock
 	}
 
@@ -110,22 +130,15 @@ func Start(w http.ResponseWriter, r *http.Request){
 	}
 
 }
-func updatePeers(){
+func updatePeers() {
 
-	for i := 0; i < len(PeerList.PeerIds); i++{
+	for i := 0; i < len(PeerList.PeerIds); i++ {
 		fmt.Println("\nPeer that's about to be updated", PeerList.PeerIds[i])
 
 		_, _ = http.Post("http://localhost:"+PeerList.PeerIds[i]+"/peers", "application/json", bytes.NewBuffer(PeerList.ToJson()))
 	}
 }
 
-func mainThread(){
-	var wg sync.WaitGroup
-	wg.Add(1)
-	wg.Wait()
-	go TryNoncesTillFound()
-	defer wg.Done()
-}
 func Register(w http.ResponseWriter, r *http.Request) {
 
 	//fmt.Println("CHECKING BODY \n\n")
@@ -138,8 +151,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		tempList := data.DecodeJson([]byte(body))
 		fmt.Println(tempList.PeerIds)
 		if err != nil {
-			var temp []string
-			temp = append(temp, PeerList.SelfId)
 			w.WriteHeader(http.StatusNotAcceptable)
 
 		} else {
@@ -150,8 +161,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 						alreadyPresent = true
 					}
 				}
-			if alreadyPresent == false && peer != PeerList.SelfId{
-					PeerList.PeerIds = append(PeerList.PeerIds, peer)						//send own information to new peer
+				if !alreadyPresent && peer != PeerList.SelfId {
+					PeerList.PeerIds = append(PeerList.PeerIds, peer) //send own information to new peer
 					fmt.Println("Updating peers")
 					updatePeers()
 
@@ -169,113 +180,98 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 }
 
-
-
 //When a node receives a new block in Block, the node will first check if the nonce is valid. If the nonce is not valid, ignore this Block.
 //Check if the parent block of this new block exists in its own blockchain (the previous block is the block whose hash is the parentHash of the next block) If the previous block doesn't exist, the node will ask the sender at "/block/{height}/{hash}" to download that block.
 //After making sure the previous block exists, insert the block from Block to the current BlockChain.
-func ReceiveBlock(w http.ResponseWriter, r *http.Request){
+func ReceiveBlock(w http.ResponseWriter, r *http.Request) {
 
-	if Started == false{
+	if !Started {
 		return
 	}
 
-		//w.WriteHeader(http.StatusOK)
-		fmt.Println("Checking received block")
-		var boolean bool
-		var block data.Block
+	var block *data.Block
 
-		fmt.Println("Current peerlist : ", PeerList.PeerIds)
-		//for _, peer := range PeerList.PeerIds {
-			respBody, err := readRequestBody(r)
+	fmt.Println("Current peerlist : ", PeerList.PeerIds)
+	respBody, err := readRequestBody(r)
+	if err != nil {
+		return
+	}
 
-			fmt.Println("Response we got : ", respBody)
-			fmt.Println("Error status code : ", err)
-			//_, _ = fmt.Fprint(w, resp)
-			if err == nil {
-				//
-				//	respBody, _ := readResponseBody(resp)
+	fmt.Println("Response we got : ", respBody)
+	fmt.Println("Error status code : ", err)
 
-				fmt.Println("\n Receive Block response body : ", respBody)
+	if err == nil {
 
-				var beat data.HeartBeatData
-				json.Unmarshal([]byte(respBody), &beat)
-				fmt.Println("Upated heartbeat : ", beat.SendersId, beat.BlockJson)
-					HeartBeat = beat
-					_, _ = w.Write(HeartBeat.HeartBeatDataToJson())
+		fmt.Println("\n Receive Block response body : ", respBody)
 
-					_ = json.Unmarshal([]byte(HeartBeat.BlockJson), &block)
+		var beat data.HeartBeatData
+		json.Unmarshal([]byte(respBody), &beat)
+		fmt.Println("Upated heartbeat : ", beat.SendersId, beat.BlockJson)
+		HeartBeat = beat
+		_, _ = w.Write(HeartBeat.HeartBeatDataToJson())
 
-					fmt.Println("\nDecoded block : ", block.EncodeBlockToJson())
-					boolean = block.VerifyNonce(Difficulty)
+		_ = json.Unmarshal([]byte(HeartBeat.BlockJson), &block)
 
-					fmt.Println("\n Did nonce verify? ", boolean)
+		nonceValid := block.VerifyNonce(int(Difficulty))
 
-					if boolean == true { //Block is valid
-						parent := PersonalBC.SyncGetParentBlock(block)
+		if nonceValid { //Block is valid
+			parent := PersonalBC.SyncGetParentBlock(block)
 
-						//Parent not found ie == nil
-						if parent == nil {
-							fmt.Println("having  to ask for blocks now ")
-							//Make call to recursive askForBlocksAndInsert
-							askForBlocksAndInsert(HeartBeat.SendersId, strconv.Itoa(int(block.BlockHeader.Height)), block.BlockHeader.Hash, make([]data.Block, 0))
-							parent = PersonalBC.SyncGetParentBlock(block)
-						}
+			//Parent not found ie == nil
+			if parent == nil {
+				fmt.Println("having  to ask for blocks now ")
+				//Make call to recursive askForBlocksAndInsert
+				askForBlocksAndInsert(HeartBeat.SendersId, strconv.Itoa(int(block.BlockHeader.Height)), block.BlockHeader.Hash, make([]*data.Block, 0))
+				parent = PersonalBC.SyncGetParentBlock(block)
+			}
 
-						if parent != nil {
-							//fmt.Println("ERROR HERE")
-							err = PersonalBC.Insert(block)
-
-							if err == nil{
-								fmt.Println("\nBlock inserted properly")
-							}
-						}
-
-					}
+			if parent != nil {
+				if err = PersonalBC.Insert(block); err != nil {
+					log.Printf("Could not insert block to chain : %s", err.Error())
 				}
 			}
 
+		}
+	}
+}
 
+func askForBlocksAndInsert(peer string, height string, parentHash string, blocks []*data.Block) {
 
-func askForBlocksAndInsert(peer string, height string, parentHash string, blocks []data.Block){
-
-		if height == "-1" {
-
+	if height == "-1" {
 		return
-		}
-		var urlSTR string
-		urlSTR = "http://localhost:" + peer + "/block/"+ height + "/" + parentHash
-		uRL, _ := url.ParseRequestURI(urlSTR)
-		fmt.Println("URL accessed " + uRL.String())
-		var resp, err = http.Get(uRL.String())
-		if err != nil{
-			fmt.Println(resp, err)
-			return
-		}
-
-		fmt.Println("Response : ",resp)
-
-		fmt.Println(blocks)
-		respBody, _ := readResponseBody(resp)
-		fmt.Println("\nResponse body from recursive function : ", respBody)
-		newBlock := data.DecodeBlockFromJson(respBody)
-		parent := PersonalBC.BC.GetParentBlock(newBlock)
-		fmt.Println("\nEncoded block from recursive function @ height " + height + "&& @ hash" + parentHash + ": ", newBlock.EncodeBlockToJson())
-		//Parent not found == nil
-		if parent != nil || newBlock.BlockHeader.Height == 0{
-
-			for _, block := range blocks {
-				fmt.Println("Inserting block recursively\n")
-				_ = PersonalBC.BC.Insert(block)
-				return
-			}
-		}
-		blocks = append(blocks, newBlock)
-		fmt.Println(blocks)
-		askForBlocksAndInsert(peer, strconv.Itoa(int(newBlock.BlockHeader.Height-1)), newBlock.BlockHeader.ParentHash, blocks)
 	}
 
+	urlSTR := "http://localhost:" + peer + "/block/" + height + "/" + parentHash
+	uRL, _ := url.ParseRequestURI(urlSTR)
+	fmt.Println("URL accessed " + uRL.String())
+	var resp, err = http.Get(uRL.String())
+	if err != nil {
+		fmt.Println(resp, err)
+		return
+	}
 
+	fmt.Println("Response : ", resp)
+
+	fmt.Println(blocks)
+	respBody, _ := readResponseBody(resp)
+	fmt.Println("\nResponse body from recursive function : ", respBody)
+	newBlock, err := data.DecodeBlockFromJson(respBody)
+	if err != nil {
+		log.Printf("Error decoding JSON: %s", err.Error())
+		return
+	}
+	parent := PersonalBC.BC.GetParentBlock(newBlock)
+
+	if parent != nil || newBlock.BlockHeader.Height == 0 {
+		for _, block := range blocks {
+			_ = PersonalBC.BC.Insert(block)
+			return
+		}
+	}
+	blocks = append(blocks, newBlock)
+	fmt.Println(blocks)
+	askForBlocksAndInsert(peer, strconv.Itoa(int(newBlock.BlockHeader.Height-1)), newBlock.BlockHeader.ParentHash, blocks)
+}
 
 func readResponseBody(resp *http.Response) (string, error) {
 	respBody, err := ioutil.ReadAll(resp.Body)
@@ -295,46 +291,36 @@ func readRequestBody(r *http.Request) (string, error) {
 	return string(reqBody), nil
 }
 
-
-
-func GetBlock(w http.ResponseWriter, r *http.Request){
-
+func GetBlock(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
-	height , err := strconv.Atoi(vars["height"])
+	height, err := strconv.Atoi(vars["height"])
 	fmt.Println(height)
 
 	hash := vars["hash"]
-	fmt.Println(hash)
 
-	if err != nil{
-		panic(err)
+	if err != nil {
+		panic(err) // NO
 	}
 	tempChain := PersonalBC.BC.Chain[int32(height)]
 
-	for i := 0; i < len(tempChain); i++{
+	for i := 0; i < len(tempChain); i++ {
 
-		if tempChain[i].BlockHeader.Hash == hash{
-			//fmt.Println("Found peer BC : ", tempChain[i].EncodeBlockToJson())
+		if tempChain[i].BlockHeader.Hash == hash {
 			w.WriteHeader(http.StatusOK)
 			fmt.Println(SelfAddress + " posting data to peers")
-			//writeBlock := []byte(tempChain[i].EncodeBlockToJson())
-			//w.Write([]byte(tempChain[i].EncodeBlockToJson()))
-			//_, err = http.Post(SELF_ADDRESS +"/block/" + strconv.Itoa(height)+ "/" + hash , "application/json", bytes.NewBuffer([]byte(tempChain[i].EncodeBlockToJson())))
-			fmt.Fprint(w, tempChain[i].EncodeBlockToJson())
-			fmt.Println("Response error : " , err)
+
+			fmt.Fprint(w)
+			fmt.Println("Response error : ", err)
 			return
 		}
 	}
-	fmt.Println("CANNOT FIND BLOCK IN GET BLOCK METHOD \n")
 	w.WriteHeader(http.StatusNoContent)
 }
 
-
-
 func ShowPeers(w http.ResponseWriter, r *http.Request) {
 
-w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data.PeerIdsToJson(PeerList.PeerIds))
 }
 
@@ -342,20 +328,19 @@ func SendBlock() {
 
 	for i := 0; i < len(PeerList.PeerIds); i++ {
 
-		fmt.Println("Data that's about to sent to peer "+ PeerList.PeerIds[i]+ ": " + string(HeartBeat.HeartBeatDataToJson()))
+		fmt.Println("Data that's about to sent to peer " + PeerList.PeerIds[i] + ": " + string(HeartBeat.HeartBeatDataToJson()))
 
 		err, _ := http.Post("http://localhost:"+PeerList.PeerIds[i]+"/block/receive", "application/json", bytes.NewBuffer(HeartBeat.HeartBeatDataToJson()))
 
-			 fmt.Println("Error coding from posting block", err)
+		fmt.Println("Error coding from posting block", err)
 
 	}
 }
 
-func Show(w http.ResponseWriter, r *http.Request){
+func Show(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(PersonalBC.BC)
 	fmt.Println("-------")
 	fmt.Println(PersonalBC.BC.Length)
-	fmt.Fprint(w, 	PersonalBC.BC.Show())
+	fmt.Fprint(w, PersonalBC.BC.Show())
 
 }
-

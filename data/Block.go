@@ -1,17 +1,16 @@
 package data
 
-
-import(
+import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
-	)
+)
 
+// TODO: put into general crypto package
 //Generates hash value
-func HashFunction(input string) string{
+func SHA256(input string) string {
 
 	x := sha256.New()
 	x.Write([]byte(input))
@@ -20,71 +19,53 @@ func HashFunction(input string) string{
 }
 
 //Added Nonce to Block-Header
-type Header struct{
-	Height int32
-	Timestamp int64
-	Hash string
+type Header struct {
+	Height     int32
+	Timestamp  int64
+	Hash       string
 	ParentHash string
-	Size int32 //size of merkle tree
-	Nonce string
+	Size       int32 //size of merkle tree
+	Nonce      string
 }
 
-type Block struct{
-	BlockHeader Header
-	Value string 
+type Block struct {
+	BlockHeader Header // TODO: change var name to header and make access private
+	Value       string
 }
 
-func (block *Block) Initial(height int32, parentHash string, value string){
-
+func (block *Block) Init(height int32, parentHash string, value string) {
 	t := time.Now().UnixNano()
 	size := int32(len(value))
-	hash := HashFunction( string(height) + string(t)  + string (parentHash) + string (size) + string (value))
- 	block.BlockHeader = Header{height, t, hash, parentHash, size, ""}
+	hash := SHA256(string(height) + string(t) + string(parentHash) + string(size) + string(value))
+
+	block.BlockHeader = Header{height, t, hash, parentHash, size, ""}
 	block.Value = value
-
 }
 
-func (block *Block)setNonce(nonce string){
+func (block *Block) VerifyNonce(difficulty int) bool {
+	hash := SHA256(block.BlockHeader.ParentHash + block.BlockHeader.Nonce + block.Value)
 
-	block.BlockHeader.Nonce = nonce
+	return strings.Count(hash[0:difficulty], "0") >= difficulty
 }
 
-
-func (block *Block) VerifyNonce(difficulty int) bool{
-
-	hash := HashFunction(block.BlockHeader.ParentHash + block.BlockHeader.Nonce + block.Value)
-
-
-	if strings.Count(hash[0 : difficulty], "0") >= difficulty{
-
-		return true
-	}
-
-	return false
-
-}
-
-func DecodeBlockFromJson(jsonString string) Block {
-
+func DecodeBlockFromJson(jsonString string) (*Block, error) {
 	var block Block
 
-	_ = json.Unmarshal([]byte(jsonString), &block)
+	err := json.Unmarshal([]byte(jsonString), &block)
+	if err != nil {
+		return nil, err
+	}
 
-	return block
+	return &block, nil
 }
 
+func (block *Block) EncodeBlockToJson() (string, error) {
+	var jsonData []byte
 
-func (block *Block) EncodeBlockToJson() string{
+	jsonData, err := json.Marshal(block)
+	if err != nil {
+		return "", err
+	}
 
-		var jsonData []byte
-
-		jsonData, err := json.Marshal(block)
-
-		if err != nil{
-		
-			fmt.Println("ERROR Encoding-To-String")
-			panic(err)
-		}
-
-		return string(jsonData)
+	return string(jsonData), err
 }

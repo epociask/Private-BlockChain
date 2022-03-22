@@ -2,26 +2,27 @@ package data
 
 import (
 	"encoding/json"
+
 	"github.com/pkg/errors"
 )
 
-type PeerList struct{
-	SelfId string
+type PeerList struct {
+	SelfId  string
 	PeerIds []string
-	Length int
+	Length  int
 }
 
-
-//Peer list ----> JSON
-func PeerIdsToJson(q []string) []byte {
-	value, err := json.Marshal(q)
+// PeerIdsToJson ...
+func PeerIdsToJson(peerList []string) []byte {
+	value, err := json.Marshal(peerList)
 	if err != nil {
 		return []byte{}
 	}
 	return value
 }
-//JSON ----> registered data
-func JsonToPeerIds(inputJson []byte) ([] string, error) {
+
+// JsonToPeerIds ...
+func JsonToPeerIds(inputJson []byte) ([]string, error) {
 	var ques []string
 	err := json.Unmarshal(inputJson, &ques)
 	if err != nil {
@@ -30,14 +31,14 @@ func JsonToPeerIds(inputJson []byte) ([] string, error) {
 	return ques, nil
 }
 
-func (pl *PeerList) InsertToList(peerList []string){
+func (pl *PeerList) InsertToList(peerList []string) {
 
-	for _, port := range peerList{
+	for _, port := range peerList {
 
-		if port != pl.SelfId{
+		if port != pl.SelfId {
 
 			pl.PeerIds = append(pl.PeerIds, port)
-	}
+		}
 	}
 }
 
@@ -46,16 +47,11 @@ func (pl *PeerList) ToJson() []byte {
 	return value
 }
 
-func  DecodeJson( temp []byte)  PeerList {
+func DecodeJson(temp []byte) PeerList {
 
 	var templist PeerList
-	_ =  json.Unmarshal(temp, &templist)
+	_ = json.Unmarshal(temp, &templist)
 
 	return templist
 
-
 }
-
-
-
-

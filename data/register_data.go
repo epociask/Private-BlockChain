@@ -2,15 +2,16 @@ package data
 
 import (
 	"encoding/json"
+
 	"github.com/pkg/errors"
 )
 
-type RegisterData struct{
-	AssignedId string
+type RegisterData struct {
+	AssignedId  string
 	PeerMapJson string
 }
 
-//Registered Data ----> JSON
+// ToJson ...
 func (q *RegisterData) ToJson() ([]byte, error) {
 	value, err := json.Marshal(q)
 	if err != nil {
@@ -18,7 +19,8 @@ func (q *RegisterData) ToJson() ([]byte, error) {
 	}
 	return value, nil
 }
-//JSON ----> registered data
+
+// RegisteredDataFromJson ...
 func RegisteredDataFromJson(inputJson []byte) (RegisterData, error) {
 	ques := RegisterData{}
 	err := json.Unmarshal(inputJson, &ques)
